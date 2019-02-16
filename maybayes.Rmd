@@ -266,10 +266,10 @@ sigma_posterior     = 1/sqrt(Model1$BUGSoutput$summary[4,1])
 # having some estimates for the parameters nu and tau (mean and variance of the random effect delta respectively) is it possible to plot the original distribution declared in the model with the new parameters found with MCMC procedure
 ggplot(data = data.frame(x = c(-2.5, 2.5)), aes(x)) +
   theme_bw()+
-  theme(plot.title = element_text(size = 15), text = element_text(size=15))+
+  theme(plot.title = element_text(size = 15), text = element_text(size=12))+
   stat_function(fun = dnorm, args = list(mean = 0, sd = 1), aes(colour = "Prior")) +
   stat_function(fun = dnorm, args = list(mean = nu_posterior, sd = sigma_posterior), aes(colour="Posterior")) +
-  labs(title = expression(paste("Prior and posterior distribution of random effect ",delta)))+
+  labs(title = expression(paste("Prior and posterior distribution of random effect ",delta)), subtitle = "Model 1")+
   geom_vline(xintercept = 0, colour = "darkgrey", linetype = "longdash")+
   geom_vline(xintercept = nu_posterior, colour = "deepskyblue", linetype = "longdash")+
   scale_colour_manual("Distrubtutions", 
@@ -355,7 +355,7 @@ ggplot(data = data.frame(x = c(-5, 5)), aes(x)) +
   labs(title = expression(paste("Zoom on priors tails")), subtitle = "Left tail", y = "Probability", x = expression(delta))+
   scale_colour_manual("Priors", 
                     breaks = c("Model1", "Model2"),
-                    values = c("red", "darkgrey"))
+                    values = c("red", "dimgrey"))
 
 
 # zoom right tail
@@ -368,7 +368,7 @@ ggplot(data = data.frame(x = c(-5, 5)), aes(x)) +
   labs(title = expression(paste("Zoom on priors tails")), subtitle = "Right tail", y = "Probability", x = expression(delta))+
   scale_colour_manual("Priors", 
                     breaks = c("Model1", "Model2"),
-                    values = c("red", "darkgrey"))
+                    values = c("red", "dimgrey"))
 ```
 
 ```{r}
@@ -384,7 +384,7 @@ ggplot(data = data.frame(x = c(1, 1000)), aes(x)) +
   labs(title = expression(paste("Zoom on prior right tail")),subtitle = "Log-Log scale", y = "Probability", x = expression(delta))+
   scale_colour_manual("Priors", 
                     breaks = c("Model1", "Model2"),
-                    values = c("red", "darkgrey"))
+                    values = c("red", "dimgrey"))
 ```
 
 
