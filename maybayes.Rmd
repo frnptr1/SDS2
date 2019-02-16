@@ -17,7 +17,7 @@ library(magrittr)
 library(dplyr)
 library(RColorBrewer)
 library(ggthemes)
-library(extraDistr)
+library(scales)
 set.seed(2)
 ```
 
@@ -335,33 +335,169 @@ ns_t = function(x, mu, tau, k){
 ggplot(data = data.frame(x = c(-5, 5)), aes(x)) + 
   theme_bw() + 
   theme(plot.title = element_text(size = 15), text = element_text(size=15))+
-  stat_function(fun = ns_t, args = list(mu=0, tau = 1, k = 3), size = 0.5, aes(colour = "Model1")) + 
-  stat_function(fun = dnorm, args = list(mean = 0, sd = 1), size = 0.5, aes(colour = "Model2"))+
+  stat_function(fun = ns_t, args = list(mu=0, tau = 1, k = 3), size = 0.5, aes(colour = "Model2")) + 
+  stat_function(fun = dnorm, args = list(mean = 0, sd = 1), size = 0.5, aes(colour = "Model1"))+
   xlim(-5,5)+
   labs(title = expression(paste("Prior distribution of ", delta)), y = "Probability", x = expression(delta))+
   scale_colour_manual("Priors", 
                     breaks = c("Model1", "Model2"),
-                    values = c("darkgrey", "red"))
+                    values = c("red", "dimgrey"))
+```
+
+```{r}
+# zoom left tail
+ggplot(data = data.frame(x = c(-5, 5)), aes(x)) + 
+  theme_bw() + 
+  theme(plot.title = element_text(size = 15), text = element_text(size=10))+
+  stat_function(fun = ns_t, args = list(mu=0, tau = 1, k = 3), size = 0.5, aes(colour = "Model2")) + 
+  stat_function(fun = dnorm, args = list(mean = 0, sd = 1), size = 0.5, aes(colour = "Model1"))+
+  xlim(-10,-5)+
+  labs(title = expression(paste("Zoom on priors tails")), subtitle = "Left tail", y = "Probability", x = expression(delta))+
+  scale_colour_manual("Priors", 
+                    breaks = c("Model1", "Model2"),
+                    values = c("red", "darkgrey"))
+
+
+# zoom right tail
+ggplot(data = data.frame(x = c(-5, 5)), aes(x)) + 
+  theme_bw() + 
+  theme(plot.title = element_text(size = 15), text = element_text(size=10))+
+  stat_function(fun = ns_t, args = list(mu=0, tau = 1, k = 3), size = 0.5, aes(colour = "Model2")) + 
+  stat_function(fun = dnorm, args = list(mean = 0, sd = 1), size = 0.5, aes(colour = "Model1"))+
+  xlim(5,10)+
+  labs(title = expression(paste("Zoom on priors tails")), subtitle = "Right tail", y = "Probability", x = expression(delta))+
+  scale_colour_manual("Priors", 
+                    breaks = c("Model1", "Model2"),
+                    values = c("red", "darkgrey"))
+```
+
+```{r}
+ggplot(data = data.frame(x = c(1, 1000)), aes(x)) + 
+  theme_bw() + 
+  theme(plot.title = element_text(size = 15), text = element_text(size=12))+
+  stat_function(fun = ns_t, args = list(mu=0, tau = 1, k = 3), size = 0.5, aes(colour = "Model2")) + 
+  stat_function(fun = dnorm, args = list(mean = 0, sd = 1), size = 0.5, aes(colour = "Model1"))+
+ scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
+        labels = trans_format("log10", math_format(10^.x))) +
+ scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+          labels = trans_format("log10", math_format(10^.x))) +
+  labs(title = expression(paste("Zoom on prior right tail")),subtitle = "Log-Log scale", y = "Probability", x = expression(delta))+
+  scale_colour_manual("Priors", 
+                    breaks = c("Model1", "Model2"),
+                    values = c("red", "darkgrey"))
+```
+
+
+```{r}
+# traceplot, running mean, posterior density
+gg_model2 = ggs(as.mcmc(Model2))
+
+# traceplot of parameters of interest
+ggs_traceplot(gg_model2, greek = TRUE)+   
+  theme_bw()
+
+# traceplot of running mean
+ggs_running(gg_model2, greek = TRUE)+
+  theme_bw()
+
+# plot posterior density
+ggs_density(gg_model2, greek = TRUE)+
+  theme_bw()
+```
+
+```{r}
+# evaluate the autocorrelation of all the parameters for the 3 chains
+autocorrelated_delta_new2 = apply(Model2$BUGSoutput$sims.array[,,1], 2, acf, lag.max = 18000, plot = FALSE)
+autocorrelated_deviance2  = apply(Model2$BUGSoutput$sims.array[,,2], 2, acf, lag.max = 18000, plot = FALSE)
+autocorrelated_nu2        = apply(Model2$BUGSoutput$sims.array[,,3], 2, acf, lag.max = 18000, plot = FALSE)
+autocorrelated_tau2       = apply(Model2$BUGSoutput$sims.array[,,4], 2, acf, lag.max = 18000, plot = FALSE)
+
+# attach the acf values of 3 chain in a unique matrix for each parameter
+autocorrelated_delta_new2 = cbind(c(autocorrelated_delta_new2[[1]]$acf),
+                                  c(autocorrelated_delta_new2[[2]]$acf),
+                                  c(autocorrelated_delta_new2[[3]]$acf))
+
+autocorrelated_deviance2  = cbind(c(autocorrelated_deviance2[[1]]$acf),
+                                  c(autocorrelated_deviance2[[2]]$acf),
+                                  c(autocorrelated_deviance2[[3]]$acf))
+
+autocorrelated_nu2        = cbind(c(autocorrelated_nu2[[1]]$acf),
+                                  c(autocorrelated_nu2[[2]]$acf),
+                                  c(autocorrelated_nu2[[3]]$acf))
+
+autocorrelated_tau2       = cbind(c(autocorrelated_tau2[[1]]$acf),
+                                  c(autocorrelated_tau2[[2]]$acf),
+                                  c(autocorrelated_tau2[[3]]$acf))
+```
+
+```{r}
+# delta new
+matplot(seq(18000), autocorrelated_delta_new2, type = "l", pch = 16, lty = 1,
+        main = expression(paste(delta, " new autocorrelation")),
+        xlab = "Iteration", ylab = "Deviance",xaxt = "n", 
+        col = c("firebrick1", "springgreen2","lightslateblue"), ylim = c(-0.1, 0.1))
+axis(1, at = seq(18000), labels = paste(seq(18000)))
+legend("topright", legend = c("Chain 1", "Chain 2", "Chain 3"), 
+       col = c("firebrick1", "springgreen2","lightslateblue"), 
+       pch = c(16,16,16), lty = c(1,1,1), cex = .6)
+grid()
+
+
+# deviance
+matplot(seq(18000), autocorrelated_deviance2, type = "l", pch = 16, lty = 1,
+        main = expression(paste("Deviance autocorrelation")),
+        xlab = "Iteration", ylab = "Deviance",xaxt = "n",
+        col = c("firebrick1", "springgreen2","lightslateblue"), ylim = c(-0.1, 0.1))
+axis(1, at = seq(18000), labels = paste(seq(18000)))
+legend("topright", legend = c("Chain 1", "Chain 2", "Chain 3"), 
+       col = c("firebrick1", "springgreen2","lightslateblue"), 
+       pch = c(16,16,16), lty = c(1,1,1), cex = .6)
+grid()
+
+
+# nu
+matplot(seq(18000), autocorrelated_nu2, type = "l", pch = 16, lty = 1,
+        main = expression(paste(nu, " autocorrelation")),
+        xlab = "Iteration", ylab = "Deviance",xaxt = "n", 
+        col = c("firebrick1", "springgreen2","lightslateblue"), ylim = c(-0.1, 0.1))
+axis(1, at = seq(18000), labels = paste(seq(18000)))
+legend("topright", legend = c("Chain 1", "Chain 2", "Chain 3"), 
+       col = c("firebrick1", "springgreen2","lightslateblue"), 
+       pch = c(16,16,16), lty = c(1,1,1), cex = .6)
+grid()
+
+
+# tau
+matplot(seq(18000), autocorrelated_tau2, type = "l", pch = 16, lty = 1,
+        main = expression(paste(tau, " autocorrelation")),
+        xlab = "Iteration", ylab = "Deviance",xaxt = "n",
+        col = c("firebrick1", "springgreen2","lightslateblue"), ylim = c(-0.1, 0.1))
+axis(1, at = seq(18000), labels = paste(seq(18000)))
+legend("topright", legend = c("Chain 1", "Chain 2", "Chain 3"), 
+       col = c("firebrick1", "springgreen2","lightslateblue"), 
+       pch = c(16,16,16), lty = c(1,1,1), cex = .6)
+grid()
+```
+
+```{r}
+delta.new_posterior2 = Model2$BUGSoutput$summary[1,1]
+nu_posterior2        = Model2$BUGSoutput$summary[3,1]
+tau_posterior2       = Model2$BUGSoutput$summary[4,1]
 ```
 
 
 
 ```{r}
-# create some data to work with
-x = rnorm(1000);
-
-# overlay histogram, empirical density and normal density
-p0 = qplot(x, geom = 'blank') +   
-  geom_line(aes(y = ..density.., colour = 'Empirical'), stat = 'density') +  
-  stat_function(fun = dnorm, args = list(mean = 0, sd = 1), aes(colour = 'Normal')) +                       
-  geom_histogram(aes(y = ..density..), alpha = 0.4) +                        
-  scale_colour_manual(name = 'Density', values = c('red', 'blue')) + 
-  theme(legend.position = c(0.85, 0.85))
-
-print(p0)
-```
-
-```{r}
-curve(ns_t(x, 0, 1, 4), xlim = c(-5, 5))
+ggplot(data = data.frame(x = c(-2.5, 2.5)), aes(x)) +
+  theme_bw()+
+  theme(plot.title = element_text(size = 15), text = element_text(size=12))+
+  stat_function(fun = ns_t, args = list(mu=0, tau = 1, k = 3), size = 1, aes(colour = "Prior")) +
+  stat_function(fun = ns_t, args = list(mu=nu_posterior2, tau = tau_posterior2, k = 3), size = 1, aes(colour = "Posterior")) +
+  labs(title = expression(paste("Prior and posterior distribution of random effect ",delta)), subtitle = "Model 2")+
+  geom_vline(xintercept = 0, colour = "darkgrey", linetype = "longdash")+
+  geom_vline(xintercept = nu_posterior, colour = "deepskyblue", linetype = "longdash")+
+  scale_colour_manual("Distrubtutions", 
+                      breaks = c("Prior", "Posterior"),
+                      values = c("deepskyblue3", "dimgrey"))
 ```
 
