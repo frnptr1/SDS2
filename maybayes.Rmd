@@ -18,6 +18,9 @@ library(dplyr)
 library(RColorBrewer)
 library(ggthemes)
 library(scales)
+library(glmnet)
+library(lme4)
+library(HDInterval)
 set.seed(2)
 ```
 
@@ -499,5 +502,114 @@ ggplot(data = data.frame(x = c(-2.5, 2.5)), aes(x)) +
   scale_colour_manual("Distrubtutions", 
                       breaks = c("Prior", "Posterior"),
                       values = c("deepskyblue3", "dimgrey"))
+```
+
+# Frequentist logistic regression
+
+```{r}
+Model1_single_trial = jags( model.file="m1" , data=data , inits=init , 
+                            n.chains=3,parameters.to.save = params[3:5] ,
+                            n.iter =20000,n.thin=1,n.burnin = 2000)
+
+```
+
+
+
+
+```{r}
+mu_trials = Model1_single_trial$BUGSoutput$summary[24:45,1]
+delta_trials = Model1_single_trial$BUGSoutput$summary[1:22,1]
+
+bayesian_pt = inv.logit(mu_trials + delta_trials)
+bayesian_pc = inv.logit(mu_trials)
+```
+
+```{r}
+cbind(bayesian_pc, p_c, bayesian_pt, p_t)
+
+```
+
+
+
+
+```{r}
+Model2_single_trial = jags( model.file="m2" , data=data , inits=init , 
+                            n.chains=3,parameters.to.save = params[3:5] ,
+                            n.iter =20000,n.thin=1,n.burnin = 2000)
+```
+
+```{r}
+mu2_trials = Model2_single_trial$BUGSoutput$summary[24:45,1]
+delta2_trials = Model2_single_trial$BUGSoutput$summary[1:22,1]
+
+
+bayesian_pt2 = inv.logit(mu2_trials + delta2_trials)
+bayesian_pc2 = inv.logit(mu2_trials)
+```
+
+```{r}
+cbind(bayesian_pc2, p_c, bayesian_pt2, p_t)
+```
+
+```{r}
+ggplot(data = data.frame(x = logit_pc), aes(x)) +
+  theme_bw()+
+  theme(plot.title = element_text(size = 15))+
+  labs(title = "Densities of empirical and posterior bayesian log odds ",subtitle = "Control Group", x = "Logit(p)", y = "Density")+
+  geom_density(aes(logit(bayesian_pc2)), colour = "red", fill = "red", alpha = 0.2)+
+  geom_density(aes(logit(bayesian_pc)), colour = "green", fill = "green", alpha = 0.2)+
+  geom_density(aes(logit_pc), colour = "cyan", fill = "cyan", alpha = 0.2)
+
+
+ggplot(data = data.frame(x = logit_pt), aes(x)) +
+  theme_bw() +
+  theme(plot.title = element_text(size = 15))+
+  labs(title = "Densities of empirical and posterior bayesian log odds ",subtitle = "Treatment Group", x = "Logit(p)", y = "Density")+
+  geom_density(aes(logit(bayesian_pt2)) , colour = "red", fill = "red", alpha = 0.2)+
+  geom_density(aes(logit(bayesian_pt)), colour = "green", fill = "green", alpha = 0.2)+
+  geom_density(aes(logit_pt), colour = "cyan", fill = "cyan", alpha = 0.2 )
+
+```
+
+
+```{r}
+lr  = lm(data$rt ~ data$nt)
+lr2 = lm(data$rc ~ data$nc)
+
+
+plot(x=data$nt, y=data$rt, main = "Linear Regression with empirical data", xlab = "Sample size", ylab = "Deaths", pch =16, col ="red1", cex = 1.5)
+points(x = data$nc, y = data$rc, pch = 16, col= "royalblue1", cex = 1.5)
+abline(lr, col = "red3", lwd = 2)
+abline(lr2, col = "royalblue3", lwd = 2)
+legend("bottomright", legend = c("Treatment", "Control"), col = c("red1","royalblue1"), pch = c(16,16), pt.cex = .6)
+grid()
+```
+
+```{r}
+summary(lr)
+```
+
+```{r}
+summary(lr2)
+```
+
+```{r}
+# frequentist crude estimation of delta 
+crude_delta_estimation = logit(coefficients(lr)[2])-logit(coefficients(lr2)[2])
+estimates = cbind(crude_delta_estimation, Model1$BUGSoutput$summary[1,1], Model2$BUGSoutput$summary[1,1])
+colnames(estimates) = c("Frequentist", "Bayesian m1", "Bayesian m2")
+rownames(estimates) = ""
+estimates
+```
+
+
+```{r}
+hdi_delta_new = hdi(as.mcmc(Model1$BUGSoutput$sims.array[,1,1]))
+plot(density(Model1$BUGSoutput$sims.array[,1,1]),main = expression(paste("Posterior Density Plot of ", delta)),lwd=2, xlab = expression(delta))
+abline(v=hdi_delta_new[1],col='blue', lwd=1.5)
+abline(v=hdi_delta_new[2],col='blue', lwd=1.5)
+abline(v=crude_delta_estimation, col = "orange", lwd = 1.5)
+legend("topright", legend = c("Lower/Upper hdi", "Frequentist estimate"), col = c("blue", "orange"), lty = c(1, 1), lwd = c(1.5, 1.5), cex = 0.6)
+grid()
 ```
 
