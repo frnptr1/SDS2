@@ -613,3 +613,31 @@ legend("topright", legend = c("Lower/Upper hdi", "Frequentist estimate"), col = 
 grid()
 ```
 
+```{r}
+#mix = glmer(dat$deaths/dat$patients ~ dat$patients + (1|dat$group), weights = dat$patients, family = binomial)
+```
+
+```{r}
+#summary(mix)
+```
+
+```{r}
+group = c(rep("Treat",22), rep("Control", 22))
+a = lm(c(logit_pt, logit_pc)~group)
+b = lm(c(p_t, p_c)~group)
+```
+
+```{r}
+summary(a)
+```
+
+```{r}
+summary(b)
+```
+
+
+```{r}
+plot(x = as.factor(group), y = c(logit_pt, logit_pc), type = "l")
+abline(a)
+```
+
