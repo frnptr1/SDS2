@@ -19,7 +19,6 @@ library(RColorBrewer)
 library(ggthemes)
 library(scales)
 library(glmnet)
-library(lme4)
 library(HDInterval)
 set.seed(2)
 ```
@@ -504,6 +503,50 @@ ggplot(data = data.frame(x = c(-2.5, 2.5)), aes(x)) +
                       values = c("deepskyblue3", "dimgrey"))
 ```
 
+# model 3
+
+```{r}
+model3 = "
+        model
+        {
+          for( i in 1 : Num ) {
+            rc[i] ~ dbinom(pc[i], nc[i])
+            rt[i] ~ dbinom(pt[i], nt[i])
+            pc[i] ~ dbeta(1,1)
+            pt[i] ~ dbeta(1,1)
+        }   
+      }"
+
+writeLines( model3 , con="m3" )
+
+data3 = list(rt = c(3, 7, 5, 102, 28, 4, 98, 60, 25, 138, 64, 45, 9, 57, 25, 33, 28, 8, 6, 32, 27, 22 ),
+            nt = c(38, 114, 69, 1533, 355, 59, 945, 632, 278,1916, 873, 263, 291, 858, 154, 207, 251, 151, 174, 209, 391, 680),
+            rc = c(3, 14, 11, 127, 27, 6, 152, 48, 37, 188, 52, 47, 16, 45, 31, 38, 12, 6, 3, 40, 43, 39),
+            nc = c(39, 116, 93, 1520, 365, 52, 939, 471, 282, 1921, 583, 266, 293, 883, 147, 213, 122, 154, 134, 218, 364, 674),
+            Num = 22
+            )
+#init3= function() list("a"=1, "b"=1 )
+ 
+
+params = c("pc", "pt")
+  
+Model3 = jags( model.file="m3" , data=data3, 
+                n.chains=2,parameters.to.save = params ,
+                n.iter =20000,n.thin=1,n.burnin = 2000)
+Model3
+
+out = Model3$BUGSoutput$sims.array[,1,]
+
+a = colMeans(out, dims = 1)[-1]
+
+estimates_pc = mean(a[1:22])
+estimates_pt = mean(a[22:44])
+```
+
+
+
+
+
 # Frequentist logistic regression
 
 ```{r}
@@ -572,35 +615,80 @@ ggplot(data = data.frame(x = logit_pt), aes(x)) +
 ```
 
 
+
+
+
+
+
 ```{r}
-lr  = lm(data$rt ~ data$nt)
-lr2 = lm(data$rc ~ data$nc)
+
+#log( (data$rt/(data$nt-data$rt))/(data$rc/(data$nc-data$rc)) )
+
+blocker<-read.csv("./Scaricati/BLOCKER.csv", sep=",", header=T)
+Nstud<-22
+
+blockerDat <- list(Y=blocker$Y,V=blocker$V,Nstud=Nstud)
+blockerParams <- c("d","tau","OR", "prob.OR1")
+blockerInits<-function(){
+  list("delta"=c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+       "d"=c(0),
+       "tau"=c(1))
+}
 
 
-plot(x=data$nt, y=data$rt, main = "Linear Regression with empirical data", xlab = "Sample size", ylab = "Deaths", pch =16, col ="red1", cex = 1.5)
-points(x = data$nc, y = data$rc, pch = 16, col= "royalblue1", cex = 1.5)
-abline(lr, col = "red3", lwd = 2)
-abline(lr2, col = "royalblue3", lwd = 2)
-legend("bottomright", legend = c("Treatment", "Control"), col = c("red1","royalblue1"), pch = c(16,16), pt.cex = .6)
+cat("model {
+
+# Likelihood
+
+for (j in 1:Nstud) {
+    P[j] <- 1/V[j]      # Calculate precision
+    Y[j] ~ dnorm(delta[j],P[j])
+    delta[j] ~ dnorm(d,prec)
+}
+
+                        # Priors
+d ~ dnorm(0,1.0E-6)
+prec <- 1/tau.sq
+tau.sq <- tau*tau   # tau.sq = between-study variance
+tau ~ dunif(0,10)   # Uniform on SD
+OR<-exp(d)          #exponentiate to get back to OR scale
+prob.OR1<-step(d)   #calc prob of OR > 1
+}", file="betaMeta1.txt")
+
+
+
+jag.blocker1<-jags(data=blockerDat, 
+                   inits=blockerInits, 
+                   parameters.to.save=blockerParams, n.iter=1000, n.thin=20,
+                   model.file="betaMeta1.txt")
+
+jag.blocker1
+```
+
+
+
+
+
+```{r}
+group = c(rep("Treat",22), rep("Control", 22))
+log_reg  = lm(c(logit_pt, logit_pc)~group) # log odds probability level
+prob_reg = lm(c(p_t, p_c)~group)           # probability level
+```
+
+```{r}
+summary(log_reg)
+```
+
+```{r}
+summary(prob_reg)
+```
+
+
+```{r}
+plot(x = as.factor(group), y = c(logit_pt, logit_pc), main = "Distribution of log odds wrt to Group",ylab = "logit(p)")
 grid()
 ```
 
-```{r}
-summary(lr)
-```
-
-```{r}
-summary(lr2)
-```
-
-```{r}
-# frequentist crude estimation of delta 
-crude_delta_estimation = logit(coefficients(lr)[2])-logit(coefficients(lr2)[2])
-estimates = cbind(crude_delta_estimation, Model1$BUGSoutput$summary[1,1], Model2$BUGSoutput$summary[1,1])
-colnames(estimates) = c("Frequentist", "Bayesian m1", "Bayesian m2")
-rownames(estimates) = ""
-estimates
-```
 
 
 ```{r}
@@ -608,36 +696,18 @@ hdi_delta_new = hdi(as.mcmc(Model1$BUGSoutput$sims.array[,1,1]))
 plot(density(Model1$BUGSoutput$sims.array[,1,1]),main = expression(paste("Posterior Density Plot of ", delta)),lwd=2, xlab = expression(delta))
 abline(v=hdi_delta_new[1],col='blue', lwd=1.5)
 abline(v=hdi_delta_new[2],col='blue', lwd=1.5)
-abline(v=crude_delta_estimation, col = "orange", lwd = 1.5)
+abline(v=coef(log_reg)[2], col = "orange", lwd = 1.5)
 legend("topright", legend = c("Lower/Upper hdi", "Frequentist estimate"), col = c("blue", "orange"), lty = c(1, 1), lwd = c(1.5, 1.5), cex = 0.6)
 grid()
 ```
 
-```{r}
-#mix = glmer(dat$deaths/dat$patients ~ dat$patients + (1|dat$group), weights = dat$patients, family = binomial)
-```
 
 ```{r}
-#summary(mix)
-```
-
-```{r}
-group = c(rep("Treat",22), rep("Control", 22))
-a = lm(c(logit_pt, logit_pc)~group)
-b = lm(c(p_t, p_c)~group)
-```
-
-```{r}
-summary(a)
-```
-
-```{r}
-summary(b)
-```
-
-
-```{r}
-plot(x = as.factor(group), y = c(logit_pt, logit_pc), type = "l")
-abline(a)
+# frequentist crude estimation of delta 
+freq_delta_estimation = coef(log_reg)[2]
+estimates = cbind(freq_delta_estimation, Model1$BUGSoutput$summary[1,1], Model2$BUGSoutput$summary[1,1])
+colnames(estimates) = c("Frequentist", "Bayesian m1", "Bayesian m2")
+rownames(estimates) = ""
+estimates
 ```
 
