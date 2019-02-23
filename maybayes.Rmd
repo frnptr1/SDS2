@@ -506,125 +506,10 @@ ggplot(data = data.frame(x = c(-2.5, 2.5)), aes(x)) +
 # model 3
 
 ```{r}
-model3 = "
-        model
-        {
-          for( i in 1 : Num ) {
-            rc[i] ~ dbinom(pc[i], nc[i])
-            rt[i] ~ dbinom(pt[i], nt[i])
-            pc[i] ~ dbeta(1,1)
-            pt[i] ~ dbeta(1,1)
-        }   
-      }"
-
-writeLines( model3 , con="m3" )
-
-data3 = list(rt = c(3, 7, 5, 102, 28, 4, 98, 60, 25, 138, 64, 45, 9, 57, 25, 33, 28, 8, 6, 32, 27, 22 ),
-            nt = c(38, 114, 69, 1533, 355, 59, 945, 632, 278,1916, 873, 263, 291, 858, 154, 207, 251, 151, 174, 209, 391, 680),
-            rc = c(3, 14, 11, 127, 27, 6, 152, 48, 37, 188, 52, 47, 16, 45, 31, 38, 12, 6, 3, 40, 43, 39),
-            nc = c(39, 116, 93, 1520, 365, 52, 939, 471, 282, 1921, 583, 266, 293, 883, 147, 213, 122, 154, 134, 218, 364, 674),
-            Num = 22
-            )
-#init3= function() list("a"=1, "b"=1 )
- 
-
-params = c("pc", "pt")
-  
-Model3 = jags( model.file="m3" , data=data3, 
-                n.chains=2,parameters.to.save = params ,
-                n.iter =20000,n.thin=1,n.burnin = 2000)
-Model3
-
-out = Model3$BUGSoutput$sims.array[,1,]
-
-a = colMeans(out, dims = 1)[-1]
-
-estimates_pc = mean(a[1:22])
-estimates_pt = mean(a[22:44])
-```
-
-
-
-
-
-# Frequentist logistic regression
-
-```{r}
-Model1_single_trial = jags( model.file="m1" , data=data , inits=init , 
-                            n.chains=3,parameters.to.save = params[3:5] ,
-                            n.iter =20000,n.thin=1,n.burnin = 2000)
-
-```
-
-
-
-
-```{r}
-mu_trials = Model1_single_trial$BUGSoutput$summary[24:45,1]
-delta_trials = Model1_single_trial$BUGSoutput$summary[1:22,1]
-
-bayesian_pt = inv.logit(mu_trials + delta_trials)
-bayesian_pc = inv.logit(mu_trials)
-```
-
-```{r}
-cbind(bayesian_pc, p_c, bayesian_pt, p_t)
-
-```
-
-
-
-
-```{r}
-Model2_single_trial = jags( model.file="m2" , data=data , inits=init , 
-                            n.chains=3,parameters.to.save = params[3:5] ,
-                            n.iter =20000,n.thin=1,n.burnin = 2000)
-```
-
-```{r}
-mu2_trials = Model2_single_trial$BUGSoutput$summary[24:45,1]
-delta2_trials = Model2_single_trial$BUGSoutput$summary[1:22,1]
-
-
-bayesian_pt2 = inv.logit(mu2_trials + delta2_trials)
-bayesian_pc2 = inv.logit(mu2_trials)
-```
-
-```{r}
-cbind(bayesian_pc2, p_c, bayesian_pt2, p_t)
-```
-
-```{r}
-ggplot(data = data.frame(x = logit_pc), aes(x)) +
-  theme_bw()+
-  theme(plot.title = element_text(size = 15))+
-  labs(title = "Densities of empirical and posterior bayesian log odds ",subtitle = "Control Group", x = "Logit(p)", y = "Density")+
-  geom_density(aes(logit(bayesian_pc2)), colour = "red", fill = "red", alpha = 0.2)+
-  geom_density(aes(logit(bayesian_pc)), colour = "green", fill = "green", alpha = 0.2)+
-  geom_density(aes(logit_pc), colour = "cyan", fill = "cyan", alpha = 0.2)
-
-
-ggplot(data = data.frame(x = logit_pt), aes(x)) +
-  theme_bw() +
-  theme(plot.title = element_text(size = 15))+
-  labs(title = "Densities of empirical and posterior bayesian log odds ",subtitle = "Treatment Group", x = "Logit(p)", y = "Density")+
-  geom_density(aes(logit(bayesian_pt2)) , colour = "red", fill = "red", alpha = 0.2)+
-  geom_density(aes(logit(bayesian_pt)), colour = "green", fill = "green", alpha = 0.2)+
-  geom_density(aes(logit_pt), colour = "cyan", fill = "cyan", alpha = 0.2 )
-
-```
-
-
-
-
-
-
-
-```{r}
-
+set.seed(2)
 #log( (data$rt/(data$nt-data$rt))/(data$rc/(data$nc-data$rc)) )
 
-blocker<-read.csv("./Scaricati/BLOCKER.csv", sep=",", header=T)
+blocker<-read.csv("BLOCKER.csv", sep=",", header=T)
 Nstud<-22
 
 blockerDat <- list(Y=blocker$Y,V=blocker$V,Nstud=Nstud)
@@ -653,17 +538,229 @@ tau.sq <- tau*tau   # tau.sq = between-study variance
 tau ~ dunif(0,10)   # Uniform on SD
 OR<-exp(d)          #exponentiate to get back to OR scale
 prob.OR1<-step(d)   #calc prob of OR > 1
-}", file="betaMeta1.txt")
+}", file="m3.txt")
 
 
 
 jag.blocker1<-jags(data=blockerDat, 
                    inits=blockerInits, 
-                   parameters.to.save=blockerParams, n.iter=1000, n.thin=20,
-                   model.file="betaMeta1.txt")
+                   parameters.to.save=blockerParams, n.iter=20000, n.thin=1,
+                   n.burnin = 2000,
+                   model.file="m3.txt")
 
 jag.blocker1
 ```
+
+```{r}
+# traceplot, running mean, posterior density
+gg_model3 = ggs(as.mcmc(jag.blocker1))
+
+# traceplot of parameters of interest
+ggs_traceplot(gg_model3, greek = TRUE)+   
+  theme_bw()
+
+# traceplot of running mean
+ggs_running(gg_model3, greek = TRUE)+
+  theme_bw()
+
+# plot posterior density
+ggs_density(gg_model3, greek = TRUE)+
+  theme_bw()
+```
+
+```{r}
+# evaluate the autocorrelation of all the parameters for the 3 chains
+autocorrelated_OR         = apply(jag.blocker1$BUGSoutput$sims.array[,,1], 2, acf, lag.max = 18000, plot = FALSE)
+autocorrelated_d          = apply(jag.blocker1$BUGSoutput$sims.array[,,2], 2, acf, lag.max = 18000, plot = FALSE)
+autocorrelated_deviance3  = apply(jag.blocker1$BUGSoutput$sims.array[,,3], 2, acf, lag.max = 18000, plot = FALSE)
+autocorrelated_tau3       = apply(jag.blocker1$BUGSoutput$sims.array[,,5], 2, acf, lag.max = 18000, plot = FALSE)
+
+# attach the acf values of 3 chain in a unique matrix for each parameter
+autocorrelated_OR        = cbind(c(autocorrelated_OR[[1]]$acf),
+                                 c(autocorrelated_OR[[2]]$acf),
+                                 c(autocorrelated_OR[[3]]$acf))
+
+autocorrelated_d         = cbind(c(autocorrelated_d[[1]]$acf),
+                                 c(autocorrelated_d[[2]]$acf),
+                                 c(autocorrelated_d[[3]]$acf))
+
+autocorrelated_deviance3 = cbind(c(autocorrelated_deviance3[[1]]$acf),
+                                 c(autocorrelated_deviance3[[2]]$acf),
+                                 c(autocorrelated_deviance3[[3]]$acf))
+
+autocorrelated_tau3      = cbind(c(autocorrelated_tau3[[1]]$acf),
+                                 c(autocorrelated_tau3[[2]]$acf),
+                                 c(autocorrelated_tau3[[3]]$acf))
+```
+
+
+```{r}
+matplot(seq(18000), autocorrelated_OR, type = "l", pch = 16, lty = 1,
+        main = expression(paste("OR new autocorrelation")),
+        xlab = "Iteration", ylab = "Deviance",xaxt = "n", 
+        col = c("firebrick1", "springgreen2","lightslateblue"), ylim = c(-0.1, 0.1))
+axis(1, at = seq(18000), labels = paste(seq(18000)))
+legend("topright", legend = c("Chain 1", "Chain 2", "Chain 3"), 
+       col = c("firebrick1", "springgreen2","lightslateblue"), 
+       pch = c(16,16,16), lty = c(1,1,1), cex = .6)
+grid()
+
+
+# deviance
+matplot(seq(18000), autocorrelated_d, type = "l", pch = 16, lty = 1,
+        main = expression(paste("d autocorrelation in model 3")),
+        xlab = "Iteration", ylab = "Deviance",xaxt = "n",
+        col = c("firebrick1", "springgreen2","lightslateblue"), ylim = c(-0.1, 0.1))
+axis(1, at = seq(18000), labels = paste(seq(18000)))
+legend("topright", legend = c("Chain 1", "Chain 2", "Chain 3"), 
+       col = c("firebrick1", "springgreen2","lightslateblue"), 
+       pch = c(16,16,16), lty = c(1,1,1), cex = .6)
+grid()
+
+
+# nu
+matplot(seq(18000), autocorrelated_deviance3, type = "l", pch = 16, lty = 1,
+        main = expression(paste("Deviance autocorrelation in model 3")),
+        xlab = "Iteration", ylab = "Deviance",xaxt = "n", 
+        col = c("firebrick1", "springgreen2","lightslateblue"), ylim = c(-0.1, 0.1))
+axis(1, at = seq(18000), labels = paste(seq(18000)))
+legend("topright", legend = c("Chain 1", "Chain 2", "Chain 3"), 
+       col = c("firebrick1", "springgreen2","lightslateblue"), 
+       pch = c(16,16,16), lty = c(1,1,1), cex = .6)
+grid()
+
+
+# tau
+matplot(seq(18000), autocorrelated_tau3, type = "l", pch = 16, lty = 1,
+        main = expression(paste(tau, " autocorrelation in model 3")),
+        xlab = "Iteration", ylab = "Deviance",xaxt = "n",
+        col = c("firebrick1", "springgreen2","lightslateblue"), ylim = c(-0.1, 0.1))
+axis(1, at = seq(18000), labels = paste(seq(18000)))
+legend("topright", legend = c("Chain 1", "Chain 2", "Chain 3"), 
+       col = c("firebrick1", "springgreen2","lightslateblue"), 
+       pch = c(16,16,16), lty = c(1,1,1), cex = .6)
+grid()
+```
+
+
+# hypotheys testing for odds ratio significance
+
+```{r}
+# create contingency matrix
+create_contingency = function(event_control,notevent_control,event_treat,notevent_treat){
+  mat = matrix(data = c(event_control, notevent_control,event_treat,notevent_treat), ncol = 2, nrow = 2, byrow =T)
+  return(mat)
+  }
+
+# transform the data in 2x2 contingency table
+to_2x2 = function(count_control, n_control, count_treat, n_treat){
+  
+  not_event_control = n_control-count_control
+  not_event_treat = n_treat-count_treat
+  
+  contingency_tables = list()
+  
+  for (i in 1:length(not_event_treat)){
+    contingency_tables[[i]] = create_contingency(count_control[i], 
+                                                 not_event_control[i], 
+                                                 count_treat[i], 
+                                                 not_event_treat[i])
+  }
+  return(contingency_tables)
+}
+
+# get p-value from fisher.test object
+get_fisher_pvalue = function(table){
+  return(fisher.test(table)$p.value)
+}
+
+get_chisquare_pvalue = function(table){
+  return(chisq.test(table)$p.value)
+}
+```
+
+
+```{r}
+contingency_matrices = to_2x2(data$nc, data$nc, data$rt, data$nt) 
+```
+
+```{r}
+fisher_results = lapply(contingency_matrices, get_fisher_pvalue)
+fisher_results = unlist(fisher_results)
+```
+
+```{r}
+chisquare_results = lapply(contingency_matrices, get_chisquare_pvalue)
+chisquare_results = unlist(chisquare_results)
+```
+
+
+```{r}
+cbind(rep(1:22), fisher_results, chisquare_results)
+```
+
+
+# Frequentist logistic regression
+
+```{r}
+Model1_single_trial = jags( model.file="m1" , data=data , inits=init , 
+                            n.chains=3,parameters.to.save = params[3:5] ,
+                            n.iter =20000,n.thin=1,n.burnin = 2000)
+
+Model2_single_trial = jags( model.file="m2" , data=data , inits=init , 
+                            n.chains=3,parameters.to.save = params[3:5] ,
+                            n.iter =20000,n.thin=1,n.burnin = 2000)
+```
+
+
+
+
+```{r}
+mu_trials = Model1_single_trial$BUGSoutput$summary[24:45,1]
+delta_trials = Model1_single_trial$BUGSoutput$summary[1:22,1]
+
+mu2_trials = Model2_single_trial$BUGSoutput$summary[24:45,1]
+delta2_trials = Model2_single_trial$BUGSoutput$summary[1:22,1]
+
+
+bayesian_pt = inv.logit(mu_trials + delta_trials)
+bayesian_pc = inv.logit(mu_trials)
+
+bayesian_pt2 = inv.logit(mu2_trials + delta2_trials)
+bayesian_pc2 = inv.logit(mu2_trials)
+
+cbind(p_t, bayesian_pt, bayesian_pt2)
+cbind(p_c, bayesian_pc, bayesian_pc2)
+```
+
+
+
+```{r}
+ggplot(data = data.frame(x = logit_pc), aes(x)) +
+  theme_bw()+
+  theme(plot.title = element_text(size = 15))+
+  labs(title = "Densities of empirical and posterior bayesian log odds ",subtitle = "Control Group", x = "Logit(p)", y = "Density")+
+  geom_density(aes(logit(bayesian_pc2)), colour = "red", fill = "red", alpha = 0.2)+
+  geom_density(aes(logit(bayesian_pc)), colour = "green", fill = "green", alpha = 0.2)+
+  geom_density(aes(logit_pc), colour = "cyan", fill = "cyan", alpha = 0.2)
+
+
+ggplot(data = data.frame(x = logit_pt), aes(x)) +
+  theme_bw() +
+  theme(plot.title = element_text(size = 15))+
+  labs(title = "Densities of empirical and posterior bayesian log odds ",subtitle = "Treatment Group", x = "Logit(p)", y = "Density")+
+  geom_density(aes(logit(bayesian_pt2)) , colour = "red", fill = "red", alpha = 0.2)+
+  geom_density(aes(logit(bayesian_pt)), colour = "green", fill = "green", alpha = 0.2)+
+  geom_density(aes(logit_pt), colour = "cyan", fill = "cyan", alpha = 0.2 )
+
+```
+
+
+
+
+
+
+
 
 
 
@@ -692,22 +789,22 @@ grid()
 
 
 ```{r}
-hdi_delta_new = hdi(as.mcmc(Model1$BUGSoutput$sims.array[,1,1]))
-plot(density(Model1$BUGSoutput$sims.array[,1,1]),main = expression(paste("Posterior Density Plot of ", delta)),lwd=2, xlab = expression(delta))
-abline(v=hdi_delta_new[1],col='blue', lwd=1.5)
-abline(v=hdi_delta_new[2],col='blue', lwd=1.5)
-abline(v=coef(log_reg)[2], col = "orange", lwd = 1.5)
-legend("topright", legend = c("Lower/Upper hdi", "Frequentist estimate"), col = c("blue", "orange"), lty = c(1, 1), lwd = c(1.5, 1.5), cex = 0.6)
-grid()
+# hdi_delta_new = hdi(as.mcmc(Model1$BUGSoutput$sims.array[,1,1]))
+# plot(density(Model1$BUGSoutput$sims.array[,1,1]),main = expression(paste("Posterior Density Plot of ", delta)),lwd=2, xlab = expression(delta))
+# abline(v=hdi_delta_new[1],col='blue', lwd=1.5)
+# abline(v=hdi_delta_new[2],col='blue', lwd=1.5)
+# abline(v=coef(log_reg)[2], col = "orange", lwd = 1.5)
+# legend("topright", legend = c("Lower/Upper hdi", "Frequentist estimate"), col = c("blue", "orange"), lty = c(1, 1), lwd = c(1.5, 1.5), cex = 0.6)
+# grid()
 ```
 
 
 ```{r}
 # frequentist crude estimation of delta 
-freq_delta_estimation = coef(log_reg)[2]
-estimates = cbind(freq_delta_estimation, Model1$BUGSoutput$summary[1,1], Model2$BUGSoutput$summary[1,1])
-colnames(estimates) = c("Frequentist", "Bayesian m1", "Bayesian m2")
-rownames(estimates) = ""
-estimates
+# freq_delta_estimation = coef(log_reg)[2]
+# estimates = cbind(freq_delta_estimation, Model1$BUGSoutput$summary[1,1], Model2$BUGSoutput$summary[1,1])
+# colnames(estimates) = c("Frequentist", "Bayesian m1", "Bayesian m2")
+# rownames(estimates) = ""
+# estimates
 ```
 
